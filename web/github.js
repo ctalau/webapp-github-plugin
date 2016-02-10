@@ -40,6 +40,14 @@
 
 
   var Github = function(options) {
+
+    // Url-encodes the given path without losing the '/' separators
+    // -------
+
+    function encodePath_(path) {
+      return path.split('/').map(encodeURIComponent).join('/');
+    }
+
     var API_URL = options.apiUrl || 'https://api.github.com';
 
     // HTTP Request Abstraction
@@ -48,9 +56,6 @@
     // I'm not proud of this and neither should you be if you were responsible for the XMLHttpRequest spec.
 
     function _request(method, path, data, cb, raw, sync) {
-      // # is a valid character for use in a file name on GitHub.
-      path = path.replace(new RegExp('#', 'g'), '%23');
-
       function getURL() {
         var url = path.indexOf('//') >= 0 ? path : API_URL + path;
         return url + ((/\?/).test(url) ? '&' : '?') + (new Date()).getTime();
@@ -455,7 +460,7 @@
 
       this.getSha = function(branch, path, cb) {
         if (!path || path === "") return that.getRef("heads/" + encodeURIComponent(branch), cb);
-        _request("GET", repoPath + "/contents/" + encodeURI(path) + (branch ? "?ref=" + encodeURIComponent(branch) : ""), null, function(err, pathContent) {
+        _request("GET", repoPath + "/contents/" + encodePath_(path) + (branch ? "?ref=" + encodeURIComponent(branch) : ""), null, function(err, pathContent) {
           if (err) return cb(err);
           cb(null, pathContent.sha);
         });
@@ -612,8 +617,7 @@
       // --------
 
       this.contents = function(ref, path, cb) {
-        path = encodeURI(path);
-        _request("GET", repoPath + "/contents" + (path ? "/" + encodeURI(path) : ""), { ref: ref }, cb);
+        _request("GET", repoPath + "/contents" + (path ? "/" + encodePath_(path) : ""), { ref: ref }, cb);
       };
 
       // Fork repository
@@ -687,7 +691,7 @@
       // -------
 
       this.read = function(branch, path, cb) {
-        _request("GET", repoPath + "/contents/" + encodeURI(path) + (branch ? "?ref=" + encodeURIComponent(branch) : ""), null, function(err, obj) {
+        _request("GET", repoPath + "/contents/" + encodePath_(path) + (branch ? "?ref=" + encodeURIComponent(branch) : ""), null, function(err, obj) {
           if (err && err.error === 404) return cb("not found", null, null);
 
           if (err) return cb(err);
@@ -699,7 +703,7 @@
       // -------
 
       this.createFile = function(branch, path, content, message, cb) {
-        _request("PUT", repoPath + "/contents/" + encodeURI(path), {
+        _request("PUT", repoPath + "/contents/" + encodePath_(path), {
           content: b64encode(content),
           message: message,
           branch: branch
@@ -713,7 +717,7 @@
       // -------
 
       this.getContents = function(branch, path, cb) {
-        _request("GET", repoPath + "/contents/" + encodeURI(path) + (branch ? "?ref=" + encodeURIComponent(branch) : ""), null, function(err, obj) {
+        _request("GET", repoPath + "/contents/" + encodePath_(path) + (branch ? "?ref=" + encodeURIComponent(branch) : ""), null, function(err, obj) {
           if (err && err.error === 404) return cb("not found", null, null);
 
           if (err) return cb(err);
@@ -728,7 +732,7 @@
       this.remove = function(branch, path, cb) {
         that.getSha(branch, path, function(err, sha) {
           if (err) return cb(err);
-          _request("DELETE", repoPath + "/contents/" + encodeURI(path), {
+          _request("DELETE", repoPath + "/contents/" + encodePath_(path), {
             message: path + " is removed",
             sha: sha,
             branch: branch
@@ -742,7 +746,7 @@
       this.delete = function(branch, path, cb) {
         that.getSha(branch, path, function(err, sha) {
           if (!sha) return cb("not found", null);
-          var delPath = repoPath + "/contents/" + encodeURI(path);
+          var delPath = repoPath + "/contents/" + encodePath_(path);
           var params = {
             "message": "Deleted " + path,
             "sha": sha
@@ -781,9 +785,9 @@
       // -------
 
       this.write = function(branch, path, content, message, cb) {
-        that.getSha(branch, encodeURI(path), function(err, sha) {
+        that.getSha(branch, path, function(err, sha) {
           if (err && err.error !== 404) return cb(err);
-          _request("PUT", repoPath + "/contents/" + encodeURI(path), {
+          _request("PUT", repoPath + "/contents/" + encodePath_(path), {
             message: message,
             content: b64encode(content),
             branch: branch,
