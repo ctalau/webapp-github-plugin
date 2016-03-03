@@ -1299,12 +1299,13 @@
   };
 
   /**
-   * Reset the credentials.
+   * Clears the GitHub credentials.
    */
-  GitHubLoginManager.prototype.resetCredentials = function() {
+  function clearClientSideGithubCredentials() {
     localStorage.removeItem('github.credentials');
     localStorage.removeItem('github.userName');
-  };
+    localStorage.removeItem('github.latestUrl');
+  }
 
   /**
    * The github api instance
@@ -1372,7 +1373,7 @@
         // Clear the oauth props so we won't show the login with github button (The github oauth flow is not available)
         this.setErrorMessage(errMessage);
         this.setOauthProps(null);
-        this.resetCredentials();
+        clearClientSideGithubCredentials();
 
         // On firefox the login dialog appears slightly to the bottom-right if we don't wait here
         setTimeout(goog.bind(this.getCredentials, this, callback), 0);
@@ -1407,7 +1408,7 @@
         } else {
           // If the server didn't respond with a accessToken that means we should get a new one by starting the oauth
           // flow so remove the github.credentials so that the login dialog can appear.
-          localStorage.removeItem('github.credentials');
+          clearGithubCredentials();
 
           // We don't have an access token yet, so use the clientId and state to start the oauth flow
           this.setOauthProps(credentials.clientId, credentials.state, credentials.apiUrl);
@@ -1501,7 +1502,7 @@
       getContentsAndHead(repo, fileLocation.branch, fileLocation.filePath, goog.bind(function(err, result) {
         if (err) {
           if (err.error == 401) {
-            localStorage.removeItem('github.credentials');
+            clearClientSideGithubCredentials();
             loginManager.authenticateUser(loadDocument, true);
             return;
           } else if (err == 'not found') {
@@ -1516,7 +1517,7 @@
               loginManager.setGotRepoAccess(!!repoAccess);
 
               // Try to authenticate again.
-              loginManager.resetCredentials();
+              clearClientSideGithubCredentials();
               loginManager.getCredentials(loadDocument);
             });
             return;
@@ -1524,7 +1525,7 @@
 
           // Try to authenticate again.
           loginManager.setErrorMessage('GitHub error.');
-          loginManager.resetCredentials();
+          clearClientSideGithubCredentials();
           loginManager.getCredentials(loadDocument);
           return;
         }
@@ -1654,7 +1655,7 @@
    */
   function getGithubClientIdOrToken(reset, callback) {
     if (reset) {
-      localStorage.removeItem('github.credentials');
+      clearClientSideGithubCredentials();
       localStorage.removeItem('github.oauthProps');
     }
 
@@ -1709,8 +1710,7 @@
    * Clears the github credentials from the client and from the server
    */
   function clearGithubCredentials() {
-    localStorage.removeItem('github.credentials');
-    localStorage.removeItem('github.userName');
+    clearClientSideGithubCredentials();
 
     var xhrRequest = new XMLHttpRequest();
     xhrRequest.open('POST', '../plugins-dispatcher/github-oauth/github_reset_access/', false);
