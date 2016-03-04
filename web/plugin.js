@@ -1242,18 +1242,19 @@
             contactInfo = 'https://github.com/' + documentOwner;
           }
 
-          new sync.ui.CornerTooltip(errorMessageElement,
-            '<div>' +
+          errorMessageElement.innerHTML +=
+            '<input id="gh-err-auth-chk-box" type="checkbox" class="expandable-err-msg-check" />' +
+            '<div class="expandable-err-msg">' +
             'There are 2 possible reasons for this error:' +
             '<ul>' +
             '<li>The file does not exist</li>' +
             '<li>You do not have access to read the file</li>' +
             '</ul>' +
             'You can <a href="' + contactInfo + '">contact the repository owner</a> to request access.<br/>' +
-            'Or <a href="https://github.com/" target="_blank">go to GitHub and login</a> with a user which has<br/> ' +
+            'Or <a href="https://github.com/" target="_blank">go to GitHub and login</a> with a user which has ' +
             'read access and afterwards click the "Re-login with GitHub" button.' +
-            '</div>'
-          );
+            '</div>' +
+            '<label for="gh-err-auth-chk-box" class="expandable-err-msg-more"></label>';
         });
       }
     } else {
@@ -1299,12 +1300,13 @@
   };
 
   /**
-   * Reset the credentials.
+   * Clears the GitHub credentials.
    */
-  GitHubLoginManager.prototype.resetCredentials = function() {
+  function clearClientSideGithubCredentials() {
     localStorage.removeItem('github.credentials');
     localStorage.removeItem('github.userName');
-  };
+    localStorage.removeItem('github.latestUrl');
+  }
 
   /**
    * The github api instance
@@ -1345,10 +1347,12 @@
    */
   GitHubLoginManager.prototype.authenticateUser = function(callback, reset) {
     // If we can create a valid github instance, use it
-    github = this.createGitHub();
-    if (github) {
-      var alreadyGotGithub = true;
-      callback(github);
+    if (!reset) {
+      github = this.createGitHub();
+      if (github) {
+        var alreadyGotGithub = true;
+        callback(github);
+      }
     }
 
     // But we should also make sure that our github instance is not outdated (invalid client_id/access_token)
@@ -1372,7 +1376,7 @@
         // Clear the oauth props so we won't show the login with github button (The github oauth flow is not available)
         this.setErrorMessage(errMessage);
         this.setOauthProps(null);
-        this.resetCredentials();
+        clearClientSideGithubCredentials();
 
         // On firefox the login dialog appears slightly to the bottom-right if we don't wait here
         setTimeout(goog.bind(this.getCredentials, this, callback), 0);
@@ -1405,9 +1409,23 @@
 
           callback(github);
         } else {
+          if (reset === true && !this.errorMessage) {
+            this.setErrorMessage(
+              'Error: File not found/No access.' +
+              '<input id="gh-err-auth-chk-box" type="checkbox" class="expandable-err-msg-check" />' +
+              '<div class="expandable-err-msg">' +
+              'Possible fix:<br/>' +
+              'Contact the repository owner to request access.<br/>' +
+              'Or <a href="https://github.com/" target="_blank">go to GitHub and login</a> with a user which has ' +
+              'read access and afterwards click the "Login with GitHub" button.' +
+              '</div>' +
+              '<label for="gh-err-auth-chk-box" class="expandable-err-msg-more"></label>'
+            );
+          }
+
           // If the server didn't respond with a accessToken that means we should get a new one by starting the oauth
           // flow so remove the github.credentials so that the login dialog can appear.
-          localStorage.removeItem('github.credentials');
+          clearGithubCredentials();
 
           // We don't have an access token yet, so use the clientId and state to start the oauth flow
           this.setOauthProps(credentials.clientId, credentials.state, credentials.apiUrl);
@@ -1501,7 +1519,7 @@
       getContentsAndHead(repo, fileLocation.branch, fileLocation.filePath, goog.bind(function(err, result) {
         if (err) {
           if (err.error == 401) {
-            localStorage.removeItem('github.credentials');
+            clearClientSideGithubCredentials();
             loginManager.authenticateUser(loadDocument, true);
             return;
           } else if (err == 'not found') {
@@ -1516,7 +1534,7 @@
               loginManager.setGotRepoAccess(!!repoAccess);
 
               // Try to authenticate again.
-              loginManager.resetCredentials();
+              clearClientSideGithubCredentials();
               loginManager.getCredentials(loadDocument);
             });
             return;
@@ -1524,7 +1542,7 @@
 
           // Try to authenticate again.
           loginManager.setErrorMessage('GitHub error.');
-          loginManager.resetCredentials();
+          clearClientSideGithubCredentials();
           loginManager.getCredentials(loadDocument);
           return;
         }
@@ -1654,7 +1672,7 @@
    */
   function getGithubClientIdOrToken(reset, callback) {
     if (reset) {
-      localStorage.removeItem('github.credentials');
+      clearClientSideGithubCredentials();
       localStorage.removeItem('github.oauthProps');
     }
 
@@ -1709,8 +1727,7 @@
    * Clears the github credentials from the client and from the server
    */
   function clearGithubCredentials() {
-    localStorage.removeItem('github.credentials');
-    localStorage.removeItem('github.userName');
+    clearClientSideGithubCredentials();
 
     var xhrRequest = new XMLHttpRequest();
     xhrRequest.open('POST', '../plugins-dispatcher/github-oauth/github_reset_access/', false);
@@ -2025,7 +2042,7 @@
    * @private {string} the root url.
    */
   GithubFileBrowser.prototype.extractRootUrl_ = function(url) {
-    return url && url.match('github://getFileContent/[^/]*/[^/]*/[^/]*/')[0]
+    return url && url.match('github://getFileContent/[^/]*/[^/]*/[^/]*/')[0];
   };
 
   /**
