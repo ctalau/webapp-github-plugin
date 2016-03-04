@@ -1242,18 +1242,19 @@
             contactInfo = 'https://github.com/' + documentOwner;
           }
 
-          new sync.ui.CornerTooltip(errorMessageElement,
-            '<div>' +
-            'There are 2 possible reasons for this error:' +
-            '<ul>' +
-            '<li>The file does not exist</li>' +
-            '<li>You do not have access to read the file</li>' +
-            '</ul>' +
-            'You can <a href="' + contactInfo + '">contact the repository owner</a> to request access.<br/>' +
-            'Or <a href="https://github.com/" target="_blank">go to GitHub and login</a> with a user which has<br/> ' +
-            'read access and afterwards click the "Re-login with GitHub" button.' +
-            '</div>'
-          );
+          errorMessageElement.innerHTML +=
+            '<input id="gh-err-auth-chk-box" type="checkbox" class="expandable-err-msg-check" />' +
+            '<div class="expandable-err-msg">' +
+              'There are 2 possible reasons for this error:' +
+              '<ul>' +
+                '<li>The file does not exist</li>' +
+                '<li>You do not have access to read the file</li>' +
+              '</ul>' +
+              'You can <a href="' + contactInfo + '">contact the repository owner</a> to request access.<br/>' +
+              'Or <a href="https://github.com/" target="_blank">go to GitHub and login</a> with a user which has ' +
+              'read access and afterwards click the "Re-login with GitHub" button.' +
+            '</div>' +
+            '<label for="gh-err-auth-chk-box" class="expandable-err-msg-more"></label>';
         });
       }
     } else {
@@ -1346,10 +1347,12 @@
    */
   GitHubLoginManager.prototype.authenticateUser = function(callback, reset) {
     // If we can create a valid github instance, use it
-    github = this.createGitHub();
-    if (github) {
-      var alreadyGotGithub = true;
-      callback(github);
+    if (!reset) {
+      github = this.createGitHub();
+      if (github) {
+        var alreadyGotGithub = true;
+        callback(github);
+      }
     }
 
     // But we should also make sure that our github instance is not outdated (invalid client_id/access_token)
@@ -1406,6 +1409,20 @@
 
           callback(github);
         } else {
+          if (reset === true && !this.errorMessage) {
+            this.setErrorMessage(
+              'Error: File not found/No access.' +
+              '<input id="gh-err-auth-chk-box" type="checkbox" class="expandable-err-msg-check" />' +
+              '<div class="expandable-err-msg">' +
+                'Possible fix:<br/>' +
+                'Contact the repository owner to request access.<br/>' +
+                'Or <a href="https://github.com/" target="_blank">go to GitHub and login</a> with a user which has ' +
+                'read access and afterwards click the "Login with GitHub" button.' +
+              '</div>' +
+              '<label for="gh-err-auth-chk-box" class="expandable-err-msg-more"></label>'
+            );
+          }
+
           // If the server didn't respond with a accessToken that means we should get a new one by starting the oauth
           // flow so remove the github.credentials so that the login dialog can appear.
           clearGithubCredentials();
@@ -2025,7 +2042,7 @@
    * @private {string} the root url.
    */
   GithubFileBrowser.prototype.extractRootUrl_ = function(url) {
-    return url && url.match('github://getFileContent/[^/]*/[^/]*/[^/]*/')[0]
+    return url && url.match('github://getFileContent/[^/]*/[^/]*/[^/]*/')[0];
   };
 
   /**

@@ -434,3 +434,28 @@ textarea.github-input {
 .commit-history > option:first-child {
     display: none;
 }
+
+.expandable-err-msg-check {
+    display: none;
+}
+.expandable-err-msg {
+    display: none;
+}
+.expandable-err-msg-check:checked + .expandable-err-msg {
+    padding-top: 5px;
+    text-align: left;
+    display: block;
+    overflow-y: auto;
+    height: 90px;
+}
+.expandable-err-msg-check:checked ~ .expandable-err-msg-more:after {
+    content: '...less';
+}
+.expandable-err-msg-more:after {
+    content: '...more';
+    text-align: right;
+}
+.expandable-err-msg-more:hover {
+    cursor: pointer;
+    text-decoration: underline;
+}

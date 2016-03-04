@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
@@ -180,7 +181,7 @@ public class GithubUrlConnection extends FilterURLConnection implements FileBrow
     try {
       String githubJsonResult = GithubUtil
           .inputStreamToString(delegateConnection.getInputStream());
-
+      
       // If this is a Json array:
       // [{content:'content'},{content:'content'},{content:'content'}]
       if (githubJsonResult.charAt(0) == '[') {
@@ -213,11 +214,64 @@ public class GithubUrlConnection extends FilterURLConnection implements FileBrow
         throw new UserActionRequiredException(new WebappMessage(
             WebappMessage.MESSAGE_TYPE_CUSTOM, "Authentication required",
             "Authentication required", true));
+      } if (e.getMessage().startsWith("404")) {
+        checkRepositoryAccess(e);
       } else {
         filterClientSecret(e);
       }
     }
     return filesList;
+  }
+  
+  /**
+   * Checks whether the request was not completed because we don't have repo access or because of some other error.
+   * 
+   * @param e The exception which caused the checking for access. If we do have access we will re-throw this exception because it was a valid one.
+   * 
+   * @throws UserActionRequiredException If we suspect that the user does not have access to the repository.
+   * @throws IOException When we are re-throwing the exception given as a parameter.
+   */
+  private void checkRepositoryAccess(IOException e) throws UserActionRequiredException, IOException {
+    URL url = delegateConnection.getURL();
+    
+    // protocol://host:port/repos/:owner/:repo/
+    String protocol = url.getProtocol();
+    String host = url.getHost();
+    int port = url.getPort();
+    String[] pathComponents = url.getPath().split("/");
+    String owner = pathComponents[2];
+    String repo = pathComponents[3];
+    
+    String repositoryAccessCheck = protocol + "://" + host + (port != -1 ? ":" + port : "") + 
+                                   "/repos/" + owner + "/" + repo;
+    
+    try {
+      URL repositoryAccessCheckUrl = new URL(repositoryAccessCheck);
+      HttpURLConnection accessCheckConn = (HttpURLConnection) repositoryAccessCheckUrl.openConnection();
+      accessCheckConn.setRequestProperty("Authorization", "token " + accessToken);
+      accessCheckConn.setRequestProperty("Accept", "application/vnd.github.v3+json");
+      
+      
+      int responseCode = accessCheckConn.getResponseCode();
+      
+      // If a user does not have access to view a repository on GitHub then he/she will receive a 404 error
+      // In this case we want to return a 401 to let the user know they do not have access.
+      if (responseCode == 404 || responseCode == 401) {
+        // The repository is not found, it means we do not have repo access. So throw 401.
+        throw new UserActionRequiredException(new WebappMessage(
+            WebappMessage.MESSAGE_TYPE_CUSTOM, "Authentication required",
+            "Authentication required", true));
+      }
+    } catch (MalformedURLException _) {} catch (IOException ex) {
+      if (ex.getMessage().startsWith("404") || ex.getMessage().startsWith("401")) {
+        throw new UserActionRequiredException(new WebappMessage(
+            WebappMessage.MESSAGE_TYPE_CUSTOM, "Authentication required",
+            "Authentication required", true));
+      }
+    }
+    
+    // If we didn't throw our custom exception, then just let this exception throw.
+    filterClientSecret(e);
   }
   
   /**
