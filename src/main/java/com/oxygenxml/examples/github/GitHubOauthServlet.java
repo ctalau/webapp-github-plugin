@@ -346,7 +346,7 @@ public class GitHubOauthServlet extends WebappServletPluginExtension{
     try {
       // Send the client_id and client_secret as well because we want to use the 5000 requests quota not the free one
       URL fullApiUrl = new URL(
-          (apiUrl != null ? apiUrl : "https://api.github.com") + 
+          (apiUrl != null ? apiUrl + "/api/v3" : "https://api.github.com") + 
           "/user?client_id=" + clientId + "&client_secret=" + clientSecret);
       HttpURLConnection apiConnection = (HttpURLConnection) fullApiUrl.openConnection();
       apiConnection.setRequestProperty("Authorization", "token " + accessToken);
