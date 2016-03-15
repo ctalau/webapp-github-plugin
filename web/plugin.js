@@ -1776,7 +1776,11 @@
     }
 
     if (builtinToolbar) {
+      var lastToolbarItem = builtinToolbar.children.pop();
       builtinToolbar.children.push(toolbarToAdd);
+      if (lastToolbarItem) {
+        builtinToolbar.children.push(lastToolbarItem);
+      }
     }
   }
 
