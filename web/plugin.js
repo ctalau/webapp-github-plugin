@@ -1198,13 +1198,15 @@
       this.loginDialog.getElement().innerHTML = dialogHtml;
       this.loginDialog.setTitle("GitHub Login");
 
-      this.loginDialog.onSelect(function (key) {
-        if (key == 'cancel') {
-          // Go to the dashboard view
-          window.location.href = window.location.protocol + "//" + window.location.hostname +
-            (window.location.port ? ':' + window.location.port : '') + window.location.pathname;
-        }
-      });
+      if (!isOnDashBoard) {
+        this.loginDialog.onSelect(function (key) {
+          if (key == 'cancel') {
+            // Go to the dashboard view
+            window.location.href = window.location.protocol + "//" + window.location.hostname +
+              (window.location.port ? ':' + window.location.port : '') + window.location.pathname;
+          }
+        });
+      }
     }
 
     var gotRepoAccess = this.getGotRepoAccess();
@@ -2406,8 +2408,12 @@
   workspace.getActionsManager().registerCreateAction(
     githubCreateAction);
 
+  var isOnDashBoard = false;
+
   // Invoke the callOnReturn action if one was set
   goog.events.listenOnce(workspace, sync.api.Workspace.EventType.DASHBOARD_LOADED, function (e) {
+    isOnDashBoard = true;
+
     switch (location.hash) {
     case '#github.open':
       githubOpenAction.actionPerformed();
