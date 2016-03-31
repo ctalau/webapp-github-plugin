@@ -1474,6 +1474,10 @@
 
     e.preventDefault();
 
+    fileBrowser = new GithubFileBrowser();
+    // register all the listeners on the file browser.
+    registerFileBrowserListeners(fileBrowser);
+
     var normalizedUrl = normalizeGitHubUrl(url);
 
     var loadingOptions = e.options;
@@ -1740,7 +1744,7 @@
    * Returns an object representing the file location
    * @param {string} url The url of the file.
    *              (It should always be github url: github://getFileContents/:user/:repo/:branch/:path)
-   * @returns {object} The file location descriptor
+   * @returns {{user: string, repo: string, branch: string, filePath: string}} The file location descriptor.
    */
   function getFileLocation(url) {
     var urlObj = new goog.Uri(url);
@@ -2016,13 +2020,29 @@
   /**
    * GitHub file browser.
    *
+   * @param {{initialUrl: string, ditaMapUrl: string}=} customOpenProperties
+   *
    * @constructor
    */
-  GithubFileBrowser = function() {
-    var latestUrl = localStorage.getItem('github.latestUrl');
+  function GithubFileBrowser(customOpenProperties) {
+    var initialUrl;
+
+    if (customOpenProperties) {
+      /**
+       * The ditamap which will be added as a ditamap url in files opened with this file browser.
+       * @type {string}
+       * @private
+       */
+      this.ditamapUrl_ = customOpenProperties.ditaMapUrl;
+
+      initialUrl = customOpenProperties.initialUrl;
+    } else {
+      initialUrl = localStorage.getItem('github.latestUrl');
+    }
+
     sync.api.FileBrowsingDialog.call(this, {
-      initialUrl: latestUrl,
-      root: this.extractRootUrl_(latestUrl)
+      initialUrl: initialUrl,
+      root: this.extractRootUrl_(initialUrl)
     });
     this.branchesForUrl = {};
     // The model of the selected repository in editing mode.
@@ -2038,8 +2058,16 @@
     this.keyHandleBranchSelected = null;
     // The repository rendered in the view.
     this.renderedRepo = null;
-  };
+  }
   goog.inherits(GithubFileBrowser, sync.api.FileBrowsingDialog);
+
+  /**
+   * Returns the ditamap url saved in the file browser.
+   * @return {string}
+   */
+  GithubFileBrowser.prototype.getDitaMapUrl = function () {
+    return this.ditamapUrl_;
+  };
 
   /**
    * Extracts the root URL.
@@ -2353,7 +2381,10 @@
       });
   };
 
-  var fileBrowser = new GithubFileBrowser();
+  /**
+   * @type {sync.api.FileBrowsingDialog}
+   */
+  var fileBrowser;
 
   /**
    * The name of the action to call when this page is loaded again at the end of an oauth flow.
@@ -2361,27 +2392,65 @@
    */
   var callOnReturn = null;
 
-  // register all the listeners on the file browser.
-  registerFileBrowserListeners(fileBrowser);
-
   /** @override */
-  function GithubOpenAction() {
-    sync.actions.OpenAction.apply(this, arguments);
+  function GithubOpenAction(filebrowser) {
+    sync.actions.OpenAction.call(this, filebrowser);
   }
   goog.inherits(GithubOpenAction, sync.actions.OpenAction);
 
+  /**
+   * Opens the github file browsing dialog.
+   */
   GithubOpenAction.prototype.actionPerformed = function () {
     // When an Oauth flow will finish the open action will be invoked
     callOnReturn = 'github.open';
     GithubOpenAction.superClass_.actionPerformed.apply(this, arguments);
   };
 
-  var githubOpenAction = new GithubOpenAction(fileBrowser);
+  /** @override */
+  GithubOpenAction.prototype.openFile = function (fileUrl) {
+    if(fileUrl) {
+      var newUrlParams = '?url=' + encodeURIComponent(fileUrl);
 
-  githubOpenAction.setLargeIcon(sync.util.computeHdpiIcon('../plugin-resources/github-static/Github70.png'));
-  githubOpenAction.setDescription('Open a document from your GitHub repository');
-  githubOpenAction.setActionId('github-open-action');
-  githubOpenAction.setActionName("GitHub");
+      var ditaMapUrl = /** @type {GithubFileBrowser} */ (this.urlChooser).getDitaMapUrl();
+      if (ditaMapUrl) {
+        newUrlParams += '&ditamap=' + encodeURIComponent(ditaMapUrl);
+      }
+
+      // Creating a helperUrl to manipulate the query string more easily.
+      var helperUrl = new goog.Uri('http://domain/path' + location.search);
+
+      // Removing some parameters because url and ditamap will be set now.
+      // The gh_ parameters are used once at the start of the dashboard
+      // so we don't need to transfer them to the opened document.
+      helperUrl.getQueryData().remove('url');
+      helperUrl.getQueryData().remove('ditamap');
+      helperUrl.getQueryData().remove('gh_repo');
+      helperUrl.getQueryData().remove('gh_branch');
+      helperUrl.getQueryData().remove('gh_ditamap');
+
+      var otherParams = helperUrl.getQuery();
+
+      if (otherParams) {
+        newUrlParams += '&' + helperUrl.getQuery();
+      }
+
+      var openURL = location.pathname + newUrlParams;
+      window.open(openURL);
+    }
+  };
+
+  /**
+   * Sets initialUrl and ditaMapUrl parameters which will be used when
+   * showing the file-browser dialog and when opening a file.
+   *
+   * @param {{initialUrl: string, ditaMapUrl: string}} params
+   *                           The properties with which to open the Open file dialog.
+   */
+  GithubOpenAction.prototype.setCustomOpenParams = function (params) {
+    this.initialUrl = params.initialUrl;
+    this.ditaMapUrl = params.ditaMapUrl;
+  };
 
   /** @override */
   function GithubCreateDocumentAction() {
@@ -2397,23 +2466,51 @@
     loginManager.authenticateUser(goog.bind(GithubCreateDocumentAction.superClass_.actionPerformed, this));
   };
 
-  var githubCreateAction = new GithubCreateDocumentAction(fileBrowser);
-  githubCreateAction.setLargeIcon(sync.util.computeHdpiIcon('../plugin-resources/github-static/Github70.png'));
-  githubCreateAction.setDescription('Create a file on your GitHub repository');
-  githubCreateAction.setActionId('github-create-action');
-  githubCreateAction.setActionName('Github');
+  /**
+   * @type {GithubOpenAction}
+   */
+  var githubOpenAction;
 
-  workspace.getActionsManager().registerOpenAction(
-    githubOpenAction);
-  workspace.getActionsManager().registerCreateAction(
-    githubCreateAction);
+  /**
+   * @type {GithubCreateDocumentAction}
+   */
+  var githubCreateAction;
 
   var isOnDashBoard = false;
 
-  // Invoke the callOnReturn action if one was set
-  goog.events.listenOnce(workspace, sync.api.Workspace.EventType.DASHBOARD_LOADED, function (e) {
+  goog.events.listenOnce(workspace, sync.api.Workspace.EventType.BEFORE_DASHBOARD_LOADED, function (e) {
     isOnDashBoard = true;
 
+    var customOpeningProps = getCustomGithubProps();
+    fileBrowser = new GithubFileBrowser(customOpeningProps);
+    registerFileBrowserListeners(fileBrowser);
+
+    // Setting the has so that the filebrowser will be opened in the DASHBOARD_LOADED event.
+    if (customOpeningProps) {
+      location.hash = '#github.open';
+    }
+
+    githubOpenAction = new GithubOpenAction(fileBrowser);
+
+    githubOpenAction.setLargeIcon(sync.util.computeHdpiIcon('../plugin-resources/github-static/Github70.png'));
+    githubOpenAction.setDescription('Open a document from your GitHub repository');
+    githubOpenAction.setActionId('github-open-action');
+    githubOpenAction.setActionName("GitHub");
+
+    githubCreateAction = new GithubCreateDocumentAction(fileBrowser);
+    githubCreateAction.setLargeIcon(sync.util.computeHdpiIcon('../plugin-resources/github-static/Github70.png'));
+    githubCreateAction.setDescription('Create a file on your GitHub repository');
+    githubCreateAction.setActionId('github-create-action');
+    githubCreateAction.setActionName('Github');
+
+    workspace.getActionsManager().registerOpenAction(
+      githubOpenAction);
+    workspace.getActionsManager().registerCreateAction(
+      githubCreateAction);
+  });
+
+  // Invoke the callOnReturn action if one was set
+  goog.events.listenOnce(workspace, sync.api.Workspace.EventType.DASHBOARD_LOADED, function (e) {
     switch (location.hash) {
     case '#github.open':
       githubOpenAction.actionPerformed();
@@ -2429,5 +2526,34 @@
       break;
     }
   });
+
+  /**
+   * When the gh_repo, gh_branch and gh_ditamap parameters are passed in the url we will open the filebrowser
+   * directly at the gh_repo/gh_branch location.
+   *
+   * @return {{initialUrl: string, ditaMapUrl: string}|null}
+   */
+  function getCustomGithubProps() {
+    var urlParams = sync.util.getApiParams();
+    if (urlParams.gh_repo && urlParams.gh_branch) {
+
+      var ghRepo = urlParams.gh_repo;        // :user/:repo
+      var ghBranch = urlParams.gh_branch;    // :branch
+      var ghDitamap = urlParams.gh_ditamap;  // :path/to/file
+
+      // build the initialUrl github://getFileContent/:user/:repository/:branch/
+      var initialUrl = 'github://getFileContent/' + ghRepo + '/' + encodeURIComponent(ghBranch) + '/';
+
+      // build the initialUrl github://getFileContent/:user/:repository/:branch/:path_to_ditamap
+      var ditaMapUrl = (ghDitamap ? initialUrl + ghDitamap : null);
+
+      return {
+        initialUrl: initialUrl,
+        ditaMapUrl: ditaMapUrl
+      };
+    } else {
+      return null;
+    }
+  }
 
 }());
