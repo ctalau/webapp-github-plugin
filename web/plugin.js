@@ -2535,11 +2535,11 @@
    */
   function getCustomGithubProps() {
     var urlParams = sync.util.getApiParams();
-    if (urlParams.gh_repo && urlParams.gh_branch) {
+    if (urlParams.gh_repo) {
 
-      var ghRepo = urlParams.gh_repo;        // :user/:repo
-      var ghBranch = urlParams.gh_branch;    // :branch
-      var ghDitamap = urlParams.gh_ditamap;  // :path/to/file
+      var ghRepo = urlParams.gh_repo;                  // :user/:repo
+      var ghBranch = urlParams.gh_branch || 'master';  // :branch
+      var ghDitamap = urlParams.gh_ditamap;            // :path/to/file
 
       // build the initialUrl github://getFileContent/:user/:repository/:branch/
       var initialUrl = 'github://getFileContent/' + ghRepo + '/' + encodeURIComponent(ghBranch) + '/';
