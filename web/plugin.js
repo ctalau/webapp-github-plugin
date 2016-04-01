@@ -2040,9 +2040,18 @@
       initialUrl = localStorage.getItem('github.latestUrl');
     }
 
+    // If the given initial url is not valid fallback to the latestUrl or none at all.
+    var rootUrl;
+    try {
+      rootUrl = this.extractRootUrl_(initialUrl);
+    } catch (e) {
+      initialUrl = localStorage.getItem('github.latestUrl');
+      rootUrl = this.extractRootUrl_(initialUrl);
+    }
+
     sync.api.FileBrowsingDialog.call(this, {
       initialUrl: initialUrl,
-      root: this.extractRootUrl_(initialUrl)
+      root: rootUrl
     });
     this.branchesForUrl = {};
     // The model of the selected repository in editing mode.
@@ -2432,7 +2441,7 @@
       var otherParams = helperUrl.getQuery();
 
       if (otherParams) {
-        newUrlParams += '&' + helperUrl.getQuery();
+        newUrlParams += '&' + otherParams;
       }
 
       var openURL = location.pathname + newUrlParams;
@@ -2513,13 +2522,17 @@
   goog.events.listenOnce(workspace, sync.api.Workspace.EventType.DASHBOARD_LOADED, function (e) {
     switch (location.hash) {
     case '#github.open':
-      githubOpenAction.actionPerformed();
+      setTimeout(function () {
+        githubOpenAction.actionPerformed();
+      }, 0);
 
       // Remove the fragment part of the url because users may want tot copy the url to give to someone else
       location.hash = '';
       break;
     case '#github.create':
-      githubCreateAction.actionPerformed();
+      setTimeout(function () {
+        githubCreateAction.actionPerformed();
+      });
 
       // Remove the fragment part of the url because users may want tot copy the url to give to someone else
       location.hash = '';
