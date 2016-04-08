@@ -2038,6 +2038,13 @@
       initialUrl = customOpenProperties.initialUrl;
     } else {
       initialUrl = localStorage.getItem('github.latestUrl');
+      if (!initialUrl) {
+        // If there is no URL in localstorage, try with the URL of the current file.
+        var paramUrl = sync.util.getURLParameter("url");
+        if (paramUrl) {
+          initialUrl = normalizeGitHubUrl(decodeURIComponent(paramUrl));
+        }
+      }
     }
 
     // If the given initial url is not valid fallback to the latestUrl or none at all.
