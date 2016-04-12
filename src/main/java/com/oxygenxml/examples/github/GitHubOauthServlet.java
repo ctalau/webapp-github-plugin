@@ -172,7 +172,7 @@ public class GitHubOauthServlet extends WebappServletPluginExtension{
    * @throws IOException
    */
   private void handleGithubMergeCommit(HttpServletRequest httpRequest,
-      HttpServletResponse httpResponse) throws IOException {
+      HttpServletResponse httpResponse) throws IOException, ServletException {
     // Getting the request body
     String requestBodyString = GithubUtil.inputStreamToString(httpRequest.getInputStream());
     HashMap<String, Object> requestBody = GithubUtil.parseJSON(requestBodyString);
@@ -184,26 +184,31 @@ public class GitHubOauthServlet extends WebappServletPluginExtension{
     if (ancestor != null && !ancestor.isEmpty() &&
         left != null && !left.isEmpty() &&
         right != null && !right.isEmpty()) {
-      MergeResult mergeResult = PluginWorkspaceProvider.getPluginWorkspace()
-          .getXMLUtilAccess()
-          .threeWayAutoMerge(ancestor, left, right, MergeConflictResolutionMethods.USE_LEFT);
       
-      String mergedString = mergeResult.getMergedString();
-      
-      ResultType resultType = mergeResult.getResultType();
-      
-      if (resultType == ResultType.CLEAN) {
-        httpResponse.setHeader(MERGE_RESULT_HEADER, "CLEAN");
-      } else if (resultType == ResultType.WITH_CONFLICTS) {
-        httpResponse.setHeader(MERGE_RESULT_HEADER, "WITH_CONFLICTS");
-      } else if (resultType == ResultType.FAILED) {
-        httpResponse.setHeader(MERGE_RESULT_HEADER, "FAILED");
+      try {
+        MergeResult mergeResult = PluginWorkspaceProvider.getPluginWorkspace()
+            .getXMLUtilAccess()
+            .threeWayAutoMerge(ancestor, left, right, MergeConflictResolutionMethods.USE_LEFT);
+        
+        String mergedString = mergeResult.getMergedString();
+        
+        ResultType resultType = mergeResult.getResultType();
+        
+        if (resultType == ResultType.CLEAN) {
+          httpResponse.setHeader(MERGE_RESULT_HEADER, "CLEAN");
+        } else if (resultType == ResultType.WITH_CONFLICTS) {
+          httpResponse.setHeader(MERGE_RESULT_HEADER, "WITH_CONFLICTS");
+        } else if (resultType == ResultType.FAILED) {
+          httpResponse.setHeader(MERGE_RESULT_HEADER, "FAILED");
+        }
+        
+        httpResponse.setCharacterEncoding("UTF-8");
+        httpResponse.setStatus(HttpServletResponse.SC_OK);
+        httpResponse.getWriter().write(mergedString);
+        httpResponse.flushBuffer();
+      } catch (OutOfMemoryError e) {
+        throw new ServletException("Out of memory, cannot auto-merge!");
       }
-      
-      httpResponse.setCharacterEncoding("UTF-8");
-      httpResponse.setStatus(HttpServletResponse.SC_OK);
-      httpResponse.getWriter().write(mergedString);
-      httpResponse.flushBuffer();
     } else {
       httpResponse.sendError(HttpServletResponse.SC_BAD_REQUEST);
     }
