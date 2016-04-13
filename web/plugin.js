@@ -1199,13 +1199,23 @@
       this.loginDialog.setTitle("GitHub Login");
 
       if (!isOnDashBoard) {
-        this.loginDialog.onSelect(function (key) {
+        this.loginDialog.onSelect(goog.bind(function (key) {
           if (key == 'cancel') {
-            // Go to the dashboard view
-            window.location.href = window.location.protocol + "//" + window.location.hostname +
-              (window.location.port ? ':' + window.location.port : '') + window.location.pathname;
+            // Try to open the document in read-only mode.
+            var url = decodeURIComponent(sync.util.getURLParameter('url'));
+            url = normalizeGitHubUrl(url);
+            url = url.replace('github://', 'github-ro://');
+
+            var urlParams = sync.util.getOpenLinkUrlParams();
+            var ditamap = denormalizeGithubUrl(urlParams.ditamap);
+            if (ditamap) {
+              urlParams.ditamap = ditamap;
+            }
+
+            var githubReadOnlyUrl = sync.util.serializeQueryString(url, urlParams);
+            window.open(githubReadOnlyUrl, "_self");
           }
-        });
+        }, this));
       }
     }
 
@@ -1468,7 +1478,12 @@
   goog.events.listenOnce(workspace, sync.api.Workspace.EventType.BEFORE_EDITOR_LOADED, function(e) {
     var url = e.options.url;
     var editor = e.editor;
-    if (!isGitHubUrl(url)) {
+
+    if (isGithubReadonlyUrl(url)) {
+      e.preventDefault();
+      loadReadOnlyUrl(url, e.options, editor);
+      return;
+    } else if (!isGitHubUrl(url)) {
       return;
     }
 
@@ -1671,6 +1686,25 @@
   }, true);
 
   /**
+   * Loads the given url in read-only mode
+   * @param {string} url The url of the document to load.
+   * @param {sync.api.Workspace.LoadingOptions} loadingOptions The loading Options.
+   * @param {sync.api.Editor} editor The editor which loads the url.
+   */
+  function loadReadOnlyUrl(url, loadingOptions, editor) {
+    url = denormalizeGithubUrl(url);
+    loadingOptions.url = url;
+
+    // Remove the save action from the toolbar.
+    goog.events.listenOnce(editor, sync.api.Editor.EventTypes.ACTIONS_LOADED, function(e) {
+      editor.getActionsManager().unregisterAction('Author/Save');
+    });
+
+    // Loads the editor with the denormalized github url
+    editor.load(loadingOptions);
+  }
+
+  /**
    * Gets the github access token or client_id
    *
    * @param {boolean=} reset If true, will trigger a new OAuth flow for getting a new access token (called with true when the access token expires)
@@ -1834,13 +1868,25 @@
    * @returns {string} The normalized URL.
    */
   function normalizeGitHubUrl(url) {
-    return url.replace("https", "github")
-      .replace("http", "github")
+    return url.replace("https://", "github://")
+      .replace("http://", "github://")
       .replace("/tree/", "/blob/")
       .replace("/blob/", "/")
       .replace("www.github.com", "getFileContent")
       .replace("github.com", "getFileContent")
-      .replace("raw.githubusercontent.com", "getFileContent");
+      .replace("raw.githubusercontent.com", "getFileContent")
+      .replace("github-ro://", "github://");
+  }
+
+  /**
+   * Changes the given url from a github-readonly protocol to a https protocol.
+   * @param {string} url The url to change.
+   * @return {string|undefined} The denormalized URL.
+   */
+  function denormalizeGithubUrl(url) {
+    if (url) {
+      return url.replace(/github(-ro)?:\/\/(getFileContent)?/, 'https://raw.githubusercontent.com');
+    }
   }
 
   /**
@@ -1857,6 +1903,15 @@
         url.indexOf('raw.githubusercontent.com') != -1;
     }
     return false;
+  }
+
+  /**
+   * Checks whether a given url is a github read-only url.
+   * @param {string} url The URL to check
+   * @return {boolean} <code>true</code> if the given url is a github-readonly url.
+   */
+  function isGithubReadonlyUrl(url) {
+    return url.indexOf('github-ro') == 0;
   }
 
   /**
