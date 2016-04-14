@@ -6,6 +6,10 @@
 			<includes>
 				<include>**/*</include>
 			</includes>
+			<excludes>
+				<exclude>plugin.js</exclude>
+				<exclude>github.js</exclude>
+			</excludes>
 		</fileSet>
 	</fileSets>
 
@@ -13,6 +17,10 @@
 		<file>
 			<source>target/build/${project.build.finalName}.jar</source>
 			<outputDirectory>/lib</outputDirectory>
+		</file>
+		<file>
+			<source>target/plugin.js</source>
+			<outputDirectory>/web</outputDirectory>
 		</file>
 		<file>
 			<source>plugin.xml</source>
