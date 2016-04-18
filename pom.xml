@@ -7,6 +7,14 @@
   <version>18.1-SNAPSHOT</version>
 	<artifactId>webapp-github-plugin</artifactId>
 
+  <repositories>
+    <repository>
+      <id>oxygenxml</id>
+      <name>oXygen XML SDK Maven Repository</name>
+      <url>http://oxygenxml.com/maven/</url>
+    </repository>
+  </repositories>
+
 	<dependencies>
 		<dependency>
       <groupId>javax.servlet</groupId>
