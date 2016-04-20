@@ -27,10 +27,25 @@ public class GitAccess {
    * The name of the remote location.
    */
   private String remote = "origin";
+
+  /**
+   * Provides access to git repositories.
+   */
+  private RepositoryProvider repositoryProvider;
   
-  public void commitFile(Git git, String branchName, String filePath, 
+  /**
+   * Constructor.
+   * @param repositoryProvider
+   */
+  public GitAccess(RepositoryProvider repositoryProvider) {
+    this.repositoryProvider = repositoryProvider;
+  }
+  
+  public void commitFile(String repoUri, String branchName, String filePath, 
       String fileContents, String commitMessage, CredentialsProvider credentialsProvider, String committer) {
     try {
+      Git git = repositoryProvider.getRepository(repoUri, credentialsProvider);
+      
       prepareRepository(git, branchName, credentialsProvider);
       File repoRootDir = getGitRepoDir(git);
       
@@ -236,19 +251,33 @@ public class GitAccess {
     .setCleanDirectories(true)
     .call();
   }
-  
-  // ========================== TODO =============================
-  
+
   /**
-   * Starts an atomic commit. Works in pair with the finalizeAtomicCommit method.
+   * Returns a list of the files from the given repository and path.
+   * 
+   * @param repositoryUri The repository URI.
+   * @param branchName The branch.
+   * @param path The path of the file relative to the repository root.
+   * @param credentialsProvider Used to authenticate git requests.
+   * @return A list of the files from the given repository and path.
+   * 
+   * @throws TransportException
+   * @throws IOException
+   * @throws GitAPIException
    */
-  public boolean startAtomicCommit() {
-    return false;
-  }
-  
-  /**
-   * Finalizes an atomic commit. Works in pair with the startAtomicCommit method.
-   */
-  public void finalizeAtomicCommit(String lockAccess) {
+  public File[] listFiles(String repositoryUri, String branchName, String path,
+      CredentialsProvider credentialsProvider) throws TransportException, IOException, GitAPIException {
+
+    Git git = repositoryProvider.getRepository(repositoryUri, credentialsProvider);
+    prepareRepository(git, branchName, credentialsProvider);
+    
+    File rootDir = getGitRepoDir(git);
+    File folderToListFileFor = new File(rootDir, path);
+
+    if (folderToListFileFor.isDirectory()) {
+      return folderToListFileFor.listFiles();
+    } else {
+      return new File[0];
+    }
   }
 }

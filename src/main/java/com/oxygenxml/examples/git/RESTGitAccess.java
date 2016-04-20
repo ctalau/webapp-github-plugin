@@ -16,18 +16,27 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.TransportException;
 import org.eclipse.jgit.transport.CredentialsProvider;
 
-import com.oxygenxml.examples.github.GithubUtil;
-
 import ro.sync.ecss.extensions.api.webapp.plugin.WebappServletPluginExtension;
+import ro.sync.servlet.StartupServlet;
+import ro.sync.util.URLUtil;
+
+import com.oxygenxml.examples.github.GithubUtil;
 
 /**
  * Servlet class used to dispatch git requests to to methods.  
  * @author gabriel_titerlea
  */
 public class RESTGitAccess extends WebappServletPluginExtension {
-  private GitAccess gitAccess = new GitAccess();
+
+  /**
+   * Provides access to git repositories.
+   */
+  static RepositoryProvider repositoryProvider;
   
-  private RepositoryProvider repositoryProvider;
+  /**
+   * Provides access to git commands.
+   */
+  static GitAccess access;
   
   @Override
   public String getPath() {
@@ -36,16 +45,29 @@ public class RESTGitAccess extends WebappServletPluginExtension {
   
   @Override
   public void init() throws ServletException {
-    repositoryProvider = new RepositoryProvider(new File("")); // Read location from config file?
+    File tempDir = (File) getServletConfig().getServletContext()
+        .getAttribute(StartupServlet.JAVAX_SERVLET_CONTEXT_TEMPDIR);
+    
+    repositoryProvider = new RepositoryProvider(new File(tempDir, "git-repos-location"));
+    access = new GitAccess(repositoryProvider);
   }
   
   @Override
   public void doPost(HttpServletRequest req, HttpServletResponse resp)
       throws ServletException, IOException {
     
+    CredentialsProvider credentialsProvider = (CredentialsProvider) req.getSession()
+        .getAttribute("git.credentials.provider");
+
+    if (credentialsProvider == null) {
+      resp.setStatus(403);
+      resp.getWriter().write("You need to authorize before making requests.");
+      return;
+    } 
+    
     String pathInfo = req.getPathInfo();
     if (pathInfo.matches("\\.*git/content")) {
-      handleContentRequest(req, resp);
+      handleContentRequest(req, resp, credentialsProvider);
     }
   }
 
@@ -58,16 +80,7 @@ public class RESTGitAccess extends WebappServletPluginExtension {
    * @throws IOException
    */
   private void handleContentRequest(HttpServletRequest req,
-      HttpServletResponse resp) throws ServletException, IOException {
-    
-    CredentialsProvider credentialsProvider = (CredentialsProvider) req.getSession()
-        .getAttribute("git.credentials.provider");
-
-    if (credentialsProvider == null) {
-      resp.setStatus(403);
-      resp.getWriter().write("You need to authorize before making requests.");
-      return;
-    }
+      HttpServletResponse resp, CredentialsProvider credentialsProvider) throws ServletException, IOException {
     
     String requestBodyString = GithubUtil.inputStreamToString(req.getInputStream());
     HashMap<String, Object> requestBody = GithubUtil.parseJSON(requestBodyString);
@@ -78,11 +91,11 @@ public class RESTGitAccess extends WebappServletPluginExtension {
     
     try {
       Git git = repositoryProvider.getRepository(repositoryUri, credentialsProvider);
-      Reader fileContent = gitAccess.getFileContents(git, branchName, filePath, credentialsProvider);
+      Reader fileContent = access.getFileContents(git, branchName, filePath, credentialsProvider);
 
       ReaderInputStream inputStream = new ReaderInputStream(fileContent);
       
-      resp.setHeader("X-FILE-SHA", "file-sha");
+      resp.setHeader("OXY-FILE-SHA", "file-sha");
       IOUtils.copy(inputStream, resp.getOutputStream());
     } catch (TransportException e) {
       throw new ServletException("Failed to retrieve file content.");

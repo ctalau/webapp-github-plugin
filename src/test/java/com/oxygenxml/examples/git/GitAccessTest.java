@@ -64,10 +64,9 @@ public class GitAccessTest {
     
     FileUtils.cleanDirectory(reposDirectory);
     
-    GitAccess gitAccess = new GitAccess();
-
+    GitAccess gitAccess = new GitAccess(repositoryProvider);
     Git git = repositoryProvider.getRepository(REPOSITORY_URI, credentialsProvider);
-    
+
     String currentBranch = git.getRepository().getBranch();
     assertTrue(CURRENT_BRANCH_NAME.equals(currentBranch));
     
@@ -93,7 +92,7 @@ public class GitAccessTest {
     
     FileUtils.cleanDirectory(reposDirectory);
     
-    GitAccess gitAccess = new GitAccess();
+    GitAccess gitAccess = new GitAccess(repositoryProvider);
     Git git = repositoryProvider.getRepository(REPOSITORY_URI, credentialsProvider);
     
     File directory = gitAccess.getGitRepoDir(git);
@@ -101,7 +100,7 @@ public class GitAccessTest {
     
     String fileContents = "odd".equals(fileContentOnDisk) ? "even" : "odd";
     
-    gitAccess.commitFile(git, branchName, filePath, fileContents, commitMessage, credentialsProvider, committer);
+    gitAccess.commitFile(REPOSITORY_URI, branchName, filePath, fileContents, commitMessage, credentialsProvider, committer);
 
     // After committing do a pull to make sure that the file was indeed committed.
     git.reset().setMode(ResetType.HARD).call();
