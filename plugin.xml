@@ -16,9 +16,13 @@
  
  <extension type="URLHandler" 
     class="com.oxygenxml.examples.github.GithubURLStreamHandlerPluginExtension"/>
+        
  <extension type="WebappServlet" 
     class="com.oxygenxml.examples.github.GitHubOauthServlet"/>
  <extension type="WebappStaticResourcesFolder" path="web/static/" href="github-static"/>
  <extension type="WebappServlet" role="config"
     class="com.oxygenxml.examples.github.GithubPluginConfigExtension"/>
+    
+  <extension type="WebappServlet" 
+    class="com.oxygenxml.examples.git.RESTGitAccess"/>
 </plugin>

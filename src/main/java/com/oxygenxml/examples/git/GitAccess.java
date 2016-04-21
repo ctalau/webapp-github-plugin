@@ -270,14 +270,19 @@ public class GitAccess {
 
     Git git = repositoryProvider.getRepository(repositoryUri, credentialsProvider);
     prepareRepository(git, branchName, credentialsProvider);
+
+    // Make sure we are serving the latest version of the files.
+    git.pull()
+    .setCredentialsProvider(credentialsProvider)
+    .call();
     
     File rootDir = getGitRepoDir(git);
     File folderToListFileFor = new File(rootDir, path);
 
+    File[] filesList = null;
     if (folderToListFileFor.isDirectory()) {
-      return folderToListFileFor.listFiles();
-    } else {
-      return new File[0];
+      filesList = folderToListFileFor.listFiles();
     }
+    return filesList != null ? filesList : new File[0];
   }
 }

@@ -2,6 +2,7 @@ package com.oxygenxml.examples.github;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -13,7 +14,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.TransportException;
+import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.jboss.resteasy.util.Base64;
+
+import com.oxygenxml.examples.git.RESTGitAccess;
 
 import ro.sync.ecss.extensions.api.webapp.WebappMessage;
 import ro.sync.ecss.extensions.api.webapp.plugin.FilterURLConnection;
@@ -30,6 +36,11 @@ import ro.sync.util.URLUtil;
  */
 public class GithubUrlConnection extends FilterURLConnection implements FileBrowsingConnection {
 
+  /**
+   * The host of the urls to git (not github) requests for files list.
+   */
+  public static final String GIT_FILE_LIST_URL_HOST = "getFileList";
+  
   /**
    * The path of the opened url.
    */
@@ -177,7 +188,67 @@ public class GithubUrlConnection extends FilterURLConnection implements FileBrow
   
   @Override
   public List<FolderEntryDescriptor> listFolder() throws IOException {
-    List<FolderEntryDescriptor> filesList = new ArrayList<FolderEntryDescriptor>();
+    List<FolderEntryDescriptor> filesList = null;
+    
+    if (GIT_FILE_LIST_URL_HOST.equals(delegateConnection.getURL().getHost())) {
+      filesList = listFolderGit();
+    } else {
+      filesList = listFolderGitHub();
+    }
+    
+    return filesList == null ? new ArrayList<FolderEntryDescriptor>() : filesList;
+  }
+  
+  /**
+   * @return A list of files from the folder specified in the url field.
+   * 
+   * @throws IOException When failing to retrieve the list of files.
+   */
+  private List<FolderEntryDescriptor> listFolderGit() throws IOException {
+    List<FolderEntryDescriptor> filesList = null;
+    
+    String[] pathComponents = url.getPath().split("/");
+    
+    if (pathComponents.length < 4) {
+      throw new IOException("Malformed request.");
+    }
+    
+    String repositoryUri = URLUtil.decodeURIComponent(pathComponents[1]);
+    String branchName = URLUtil.decodeURIComponent(pathComponents[2]);
+    String path = URLUtil.decodeURIComponent(pathComponents[3]);
+    
+    try {
+      UsernamePasswordCredentialsProvider credentials = new UsernamePasswordCredentialsProvider(accessToken, "");
+      
+      File[] fileList = RESTGitAccess.access.listFiles(repositoryUri, branchName, path, credentials);
+      
+      filesList = new ArrayList<FolderEntryDescriptor>(fileList.length);
+      
+      for (File file : fileList) {
+        String absolutePath = file.getAbsolutePath().replace("\\", "/");
+        if (file.isDirectory()) {
+          absolutePath += "/";
+        }
+        
+        filesList.add(new FolderEntryDescriptor(absolutePath));
+      }
+    } catch (TransportException e) {
+      throw new IOException(e.getMessage());
+    } catch (GitAPIException e) {
+      throw new IOException(e.getMessage());
+    }
+    
+    return filesList;
+  }
+  
+  /**
+   * @return A list of files from the folder specified in the url field.
+   * 
+   * @throws IOException When failing to retrieve the list of files.
+   */
+  private List<FolderEntryDescriptor> listFolderGitHub() throws IOException {
+    List<FolderEntryDescriptor> filesList = null;
+
     try {
       String githubJsonResult = GithubUtil
           .inputStreamToString(delegateConnection.getInputStream());
@@ -188,6 +259,8 @@ public class GithubUrlConnection extends FilterURLConnection implements FileBrow
         List<GithubApiResult> githubResults = GithubUtil
             .parseGithubListResult(githubJsonResult);
 
+        filesList = new ArrayList<FolderEntryDescriptor>(githubResults.size());
+        
         for (GithubApiResult result : githubResults) {
           // Add a '/' when the file is a directory because this is how upstream
           // identifies directories
@@ -200,6 +273,8 @@ public class GithubUrlConnection extends FilterURLConnection implements FileBrow
               .encodeURIComponent(result.name) + dirChar));
         }
       } else {
+        filesList = new ArrayList<FolderEntryDescriptor>(1);
+        
         // The result is a file and its content is Base64 encoded in the content
         // property
         GithubApiResult githubResult = GithubUtil
@@ -208,6 +283,8 @@ public class GithubUrlConnection extends FilterURLConnection implements FileBrow
         byte[] decodedContent = Base64.decode(githubResult.content);
         filesList.add(new FolderEntryDescriptor(new String(decodedContent)));
       }
+      
+      return filesList;
     } catch (IOException e) {
       if (e.getMessage().startsWith("401") || e.getMessage().startsWith("403 Forbidden")) {
         // if the user is not authorized
@@ -220,6 +297,7 @@ public class GithubUrlConnection extends FilterURLConnection implements FileBrow
         filterClientSecret(e);
       }
     }
+    
     return filesList;
   }
   

@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.Reader;
 import java.util.HashMap;
 
+import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -18,7 +19,6 @@ import org.eclipse.jgit.transport.CredentialsProvider;
 
 import ro.sync.ecss.extensions.api.webapp.plugin.WebappServletPluginExtension;
 import ro.sync.servlet.StartupServlet;
-import ro.sync.util.URLUtil;
 
 import com.oxygenxml.examples.github.GithubUtil;
 
@@ -36,7 +36,7 @@ public class RESTGitAccess extends WebappServletPluginExtension {
   /**
    * Provides access to git commands.
    */
-  static GitAccess access;
+  public static GitAccess access;
   
   @Override
   public String getPath() {
@@ -45,7 +45,9 @@ public class RESTGitAccess extends WebappServletPluginExtension {
   
   @Override
   public void init() throws ServletException {
-    File tempDir = (File) getServletConfig().getServletContext()
+    ServletContext servletContext = getServletConfig().getServletContext();
+    
+    File tempDir = (File) servletContext
         .getAttribute(StartupServlet.JAVAX_SERVLET_CONTEXT_TEMPDIR);
     
     repositoryProvider = new RepositoryProvider(new File(tempDir, "git-repos-location"));
