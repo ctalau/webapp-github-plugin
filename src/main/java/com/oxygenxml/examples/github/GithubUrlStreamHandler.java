@@ -28,7 +28,7 @@ public class GithubUrlStreamHandler extends URLStreamHandlerWithContext {
         }
       };
         
-      return new GithubUrlConnection(getFileListConn, "54aac8b44cba2564570fd154d8d4e634f815c538", url.getPath());
+      return new GithubUrlConnection(getFileListConn, "ACCESS_TOKEN", url.getPath());
       
     } else {
       String urlPathPart = url.getPath();
