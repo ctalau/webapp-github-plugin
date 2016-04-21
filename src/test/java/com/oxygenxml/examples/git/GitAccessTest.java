@@ -38,6 +38,11 @@ public class GitAccessTest {
    * Repository provider needed by git access.
    */
   private RepositoryProvider repositoryProvider = new RepositoryProvider(reposDirectory);
+
+  /**
+   * Provides access to git repositories.
+   */
+  private GitAccess gitAccess = new GitAccess(repositoryProvider);
   
   /**
    * Credentials provider user to authenticate git requests.
@@ -59,20 +64,15 @@ public class GitAccessTest {
    */
   @Test
   public void testSwitchToBranch() throws Exception {
-    final String CURRENT_BRANCH_NAME = "master";
     final String NEW_BRANCH_NAME = "secora_non_existent";
-    
-    FileUtils.cleanDirectory(reposDirectory);
-    
-    GitAccess gitAccess = new GitAccess(repositoryProvider);
-    Git git = repositoryProvider.getRepository(REPOSITORY_URI, credentialsProvider);
 
-    String currentBranch = git.getRepository().getBranch();
-    assertTrue(CURRENT_BRANCH_NAME.equals(currentBranch));
+    Git git = repositoryProvider.getRepository(REPOSITORY_URI, credentialsProvider);
     
     gitAccess.switchToBranch(git, NEW_BRANCH_NAME, credentialsProvider);
     String newBranch = git.getRepository().getBranch();
     assertTrue(NEW_BRANCH_NAME.equals(newBranch));
+    
+    git.close();
   }
   
   /**
@@ -90,9 +90,6 @@ public class GitAccessTest {
     String commitMessage = "Testing git commit file api.";
     String committer = "g-tit-oxygen";
     
-    FileUtils.cleanDirectory(reposDirectory);
-    
-    GitAccess gitAccess = new GitAccess(repositoryProvider);
     Git git = repositoryProvider.getRepository(REPOSITORY_URI, credentialsProvider);
     
     File directory = gitAccess.getGitRepoDir(git);
@@ -109,5 +106,25 @@ public class GitAccessTest {
     fileContentOnDisk = FileUtils.readFileToString(new File(directory, filePath));
     
     assertEquals(fileContents, fileContentOnDisk);
+    
+    git.close();
+  }
+  
+  /**
+   * <p><b>Description:</b> Tests that the listFiles method correctly returns the files in a directory.</p>
+   * <p><b>Bug ID:</b>WA-560</p>
+   *
+   * @author gabriel_titerlea
+   *
+   * @throws Exception When it fails.
+   */
+  @Test
+  public void testListFiles() throws Exception {
+    String branchName = "1000+";
+    String path = "more_files";
+    
+    File[] listFiles = gitAccess.listFiles(REPOSITORY_URI, branchName, path, credentialsProvider);
+    
+    assertEquals(1200, listFiles.length);
   }
 }

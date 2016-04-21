@@ -43,8 +43,10 @@ public class GitAccess {
   
   public void commitFile(String repoUri, String branchName, String filePath, 
       String fileContents, String commitMessage, CredentialsProvider credentialsProvider, String committer) {
+    
+    Git git = null;
     try {
-      Git git = repositoryProvider.getRepository(repoUri, credentialsProvider);
+      git = repositoryProvider.getRepository(repoUri, credentialsProvider);
       
       prepareRepository(git, branchName, credentialsProvider);
       File repoRootDir = getGitRepoDir(git);
@@ -70,12 +72,18 @@ public class GitAccess {
       git.push()
       .setCredentialsProvider(credentialsProvider)
       .call();
+      
+      git.close();
     } catch (TransportException e) {
       // Throw to user
     } catch (IOException e) {
       // Throw to user
     } catch (GitAPIException e) {
       // Throw to user
+    } finally {
+      if (git != null) {
+        git.close();
+      }
     }
   }
 
@@ -165,11 +173,15 @@ public class GitAccess {
     if (!branch.equals(branchName)) {
       try {
         try {
-          // Create the branch locally so we can switch to it.
-          git.branchCreate()
-          .setName(branchName)
-          .setStartPoint(remote + "/" + branchName)
-          .call();
+          try {
+            // Create the branch locally so we can switch to it.
+            git.branchCreate()
+            .setName(branchName)
+            .setStartPoint(remote + "/" + branchName)
+            .call();  
+          }  catch (RefAlreadyExistsException e) {
+            // Great, can switch to it then.
+          }
           
           switchBranchInternal(git, branchName);
         } catch (RefNotFoundException e) {
@@ -283,6 +295,9 @@ public class GitAccess {
     if (folderToListFileFor.isDirectory()) {
       filesList = folderToListFileFor.listFiles();
     }
+    
+    git.close();
+    
     return filesList != null ? filesList : new File[0];
   }
 }

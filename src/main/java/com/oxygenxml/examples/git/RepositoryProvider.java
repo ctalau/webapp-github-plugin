@@ -3,10 +3,12 @@ package com.oxygenxml.examples.git;
 import java.io.File;
 import java.io.IOException;
 
+import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.TransportException;
+import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.transport.CredentialsProvider;
 
 /**
@@ -56,7 +58,15 @@ public class RepositoryProvider {
       cloneRepository(repositoryUri, repositoryDir, credentialsProvider);
     }
     
-    return Git.open(repositoryDir);
+    try {
+      return Git.open(repositoryDir);
+    } catch (RepositoryNotFoundException e) {
+      // If the repository directory contains some files, but not all the .git files (It was not properly deleted)
+      FileUtils.cleanDirectory(repositoryDir);
+      cloneRepository(repositoryUri, repositoryDir, credentialsProvider);
+      
+      return Git.open(repositoryDir);
+    }
   }
 
   /**
