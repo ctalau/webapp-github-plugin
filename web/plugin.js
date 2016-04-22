@@ -1829,6 +1829,49 @@
   }
 
   /**
+   * Transforms the given url to a gihub "getFileList" protocol url.
+   *
+   * @param {string} url The url to normalize.
+   * The given url can be a "getFileContent", "github.com" or "raw.githubusercontent.com" url.
+   *
+   * @returns {string|undefined} The normalized url.
+   * @private
+   */
+  function normalizeGitFileListUrl_(url) {
+    var matches;
+    var repositoryUrl;
+    var branch;
+    var path;
+
+    if (url.indexOf('github://getFileContent') === 0) {
+      return fromContentToListUrl_(url);
+    }
+    else {
+      // This is a normal github.com url.
+      if (url.match('https?://(?:www\.)?github.com')) {
+        matches = url.match('https?://(?:www\.)?github.com/([^/]+)/([^/]+)/*(?:blob|tree)/*([^/]*)/*(.*)');
+      }
+      // This is a RAW github url.
+      else if (url.match('https?://raw.githubusercontent.com')) {
+        matches = url.match('https?://raw.githubusercontent.com/([^/]+)/([^/]+)/*([^/]*)/*(.*)');
+      }
+
+      if (!matches) {
+        return;
+      }
+
+      repositoryUrl = 'https://github.com/' + matches[1] + '/' + matches[2];
+      branch = matches[3];
+      path = matches[4];
+
+      return 'github://getFileList/' +
+        encodeURIComponent(repositoryUrl) + '/' +
+        (branch ? encodeURIComponent(branch) + '/' : '') +
+        (path ? encodeURIComponent(path) : '');
+    }
+  }
+
+  /**
    * Changes to github url to a "github protocol" url
    * @param {string} url The URL
    * @returns {string} The normalized URL.
@@ -1841,6 +1884,67 @@
       .replace("www.github.com", "getFileContent")
       .replace("github.com", "getFileContent")
       .replace("raw.githubusercontent.com", "getFileContent");
+  }
+
+  /**
+   * Converts a "getFileContent" url to a "getFileList" url.
+   *
+   * @param {string} url The url to convert.
+   * It should have the format: github://getFileContent/:owner/:repo/:branch/:path/to/file
+   *
+   * @returns {string|undefined} The converted url or null if the given url was invalid.
+   * @private
+   */
+  function fromContentToListUrl_(url) {
+    if (url && url.indexOf('getFileContent') != -1) {
+      // [_, owner, repo, branch, path]
+      var matches = url.match('github://getFileContent/([^/]+)/([^/]+)/*([^/]*)/*(.*)');
+
+      if (!matches) {
+        return;
+      }
+
+      var owner = matches[1];
+      var repo = matches[2];
+      var branch = matches[3];
+      var path = matches[4];
+
+      var repositoryUri = 'https://github.com/' + owner + '/' + repo;
+
+      return 'github://getFileList/' +
+        encodeURIComponent(repositoryUri) + '/' +
+        (branch ? encodeURIComponent(branch) + '/' : '') +
+        (path ? encodeURIComponent(path) : '');
+    }
+  }
+
+  /**
+   * Converts a "getFileList" url to a "getFileContent" url.
+   *
+   * @param {string} url The url to convert.
+   * It should have the format: github://getFileList/:repositoryUri/:branch/:path
+   *
+   * @returns {string|undefined} The converted url or null if the given url was invalid.
+   * @private
+   */
+  function fromListToContentUrl_(url) {
+    if (url && url.indexOf('github://getFileList') === 0) {
+      // [_, repoUrl, branch, path]
+      var matches = url.match('github://getFileList/([^/]+)/*([^/]*)/*(.*)');
+
+      var repositoryUri = decodeURIComponent(matches[1]);
+      var branch = decodeURIComponent(matches[2]);
+      var path = decodeURIComponent(matches[3]);
+
+      matches = repositoryUri.match('.*/([^/]*)/([^/]*)');
+
+      var owner = matches[1];
+      var repo = matches[2];
+
+      return 'github://getFileContent/' + owner + '/' + repo +
+        (branch ? '/' + branch : '') +
+        (path ? '/' + path : '');
+    }
   }
 
   /**
