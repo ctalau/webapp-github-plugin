@@ -19,6 +19,8 @@ public class GithubUrlStreamHandler extends URLStreamHandlerWithContext {
   protected URLConnection openConnectionInContext(String contextId, URL url,
       Proxy proxy) throws IOException {
     
+    String accessToken = contextId == null ? null : GitHubPlugin.accessTokens.getIfPresent(contextId);
+    
     if (GithubUrlConnection.GIT_FILE_LIST_URL_HOST.equals(url.getHost())) {
       
       URLConnection getFileListConn = new URLConnection(url) {
@@ -28,7 +30,7 @@ public class GithubUrlStreamHandler extends URLStreamHandlerWithContext {
         }
       };
         
-      return new GithubUrlConnection(getFileListConn, "ACCESS_TOKEN", url.getPath());
+      return new GithubUrlConnection(getFileListConn, accessToken, url.getPath());
       
     } else {
       String urlPathPart = url.getPath();
@@ -56,7 +58,6 @@ public class GithubUrlStreamHandler extends URLStreamHandlerWithContext {
       
       URL apiUrl = new URL(githubApiUrlString);
       
-      String accessToken = GitHubPlugin.accessTokens.getIfPresent(contextId);
       return new GithubUrlConnection(apiUrl.openConnection(), accessToken, urlPathPart);
     }
   }

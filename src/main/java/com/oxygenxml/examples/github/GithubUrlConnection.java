@@ -209,13 +209,17 @@ public class GithubUrlConnection extends FilterURLConnection implements FileBrow
     
     String[] pathComponents = url.getPath().split("/");
     
-    if (pathComponents.length < 4) {
+    if (pathComponents.length < 3) {
       throw new IOException("Malformed request.");
     }
     
     String repositoryUri = URLUtil.decodeURIComponent(pathComponents[1]);
     String branchName = URLUtil.decodeURIComponent(pathComponents[2]);
-    String path = URLUtil.decodeURIComponent(pathComponents[3]);
+    
+    String path = "";
+    if (pathComponents.length > 3) {
+      path = URLUtil.decodeURIComponent(pathComponents[3]);  
+    }
     
     try {
       UsernamePasswordCredentialsProvider credentials = new UsernamePasswordCredentialsProvider(accessToken, "");
