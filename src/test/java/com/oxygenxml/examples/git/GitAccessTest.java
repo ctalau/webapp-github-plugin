@@ -4,10 +4,14 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
 
 import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.TransportException;
 import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.junit.Test;
@@ -53,6 +57,11 @@ public class GitAccessTest {
    * The URI of the repository used for tests.
    */
   private static final String REPOSITORY_URI = "https://github.com/g-tit-oxygen/GitAccessTests.git";
+
+  /**
+   * The URI of the second repository used for tests.
+   */
+  private static final String REPOSITORY_URI_2 = "git://github.com/g-tit-oxygen/GitAccessTest2.git";
 
   /**
    * <p><b>Description:</b> Tests the the switch branch method successfully switches to a new branch.</p>
@@ -126,5 +135,75 @@ public class GitAccessTest {
     File[] listFiles = gitAccess.listFiles(REPOSITORY_URI, branchName, path, credentialsProvider);
     
     assertEquals(1200, listFiles.length);
+  }
+  
+  /**
+   * <p><b>Description:</b> Tests that the listFiles method returns correctly when called concurrently from multiple threads.</p>
+   * <p><b>Bug ID:</b>WA-560</p>
+   *
+   * @author gabriel_titerlea
+   *
+   * @throws Exception When it fails.
+   */
+  @Test
+  public void testListFilesConcurrent() throws Exception {
+    final String branchName = "secora_non_existent";
+    final String path = "flowers/tasks";
+    
+    final String branchName2 = "master";
+    final String path2 = "topics";
+
+    final String branchName3 = "secora";
+    final String path3 = "flowers/concepts";
+    
+    final HashMap<String, Integer> nrFiles = new HashMap<String, Integer>();
+    
+    Thread t1 = new Thread(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          nrFiles.put("t1", gitAccess.listFiles(REPOSITORY_URI, branchName, path, credentialsProvider).length);
+        } catch (TransportException e) {
+        } catch (IOException e) {
+        } catch (GitAPIException e) {
+        }
+      }
+    });
+
+    Thread t2 = new Thread(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          nrFiles.put("t2", gitAccess.listFiles(REPOSITORY_URI_2, branchName2, path2, credentialsProvider).length);
+        } catch (TransportException e) {
+        } catch (IOException e) {
+        } catch (GitAPIException e) {
+        }
+      }
+    });
+    
+    Thread t3 = new Thread(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          nrFiles.put("t3", gitAccess.listFiles(REPOSITORY_URI, branchName3, path3, credentialsProvider).length);
+        } catch (TransportException e) {
+        } catch (IOException e) {
+        } catch (GitAPIException e) {
+        }
+      }
+    });
+    
+    t1.start();
+    t2.start();
+    t3.start();
+    
+    t1.join();
+    t2.join();
+    t3.join();
+    
+    assertEquals((Integer) 2, (Integer) nrFiles.get("t1"));
+    assertEquals((Integer) 5, (Integer) nrFiles.get("t2"));
+    assertEquals((Integer) 12, (Integer) nrFiles.get("t3"));
   }
 }

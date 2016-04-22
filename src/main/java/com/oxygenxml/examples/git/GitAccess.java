@@ -5,6 +5,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Reader;
+import java.util.HashMap;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
@@ -22,7 +23,11 @@ import org.eclipse.jgit.transport.CredentialsProvider;
  * @author gabriel_titerlea
  */
 public class GitAccess {
-
+  /**
+   * A map of locks on which to synchronize access to git repositories.
+   */
+  HashMap<String, Object> locks = new HashMap<String, Object>();
+  
   /**
    * The name of the remote location.
    */
@@ -165,7 +170,7 @@ public class GitAccess {
    * @param branchName The new branch to switch to.
    * @throws IOException
    */
-  void switchToBranch(Git git, String branchName, CredentialsProvider credentialsProvider) throws IOException {
+  synchronized void switchToBranch(Git git, String branchName, CredentialsProvider credentialsProvider) throws IOException {
     Repository repository = git.getRepository();
     
     String branch = repository.getBranch();
@@ -279,25 +284,44 @@ public class GitAccess {
    */
   public File[] listFiles(String repositoryUri, String branchName, String path,
       CredentialsProvider credentialsProvider) throws TransportException, IOException, GitAPIException {
-
-    Git git = repositoryProvider.getRepository(repositoryUri, credentialsProvider);
-    prepareRepository(git, branchName, credentialsProvider);
-
-    // Make sure we are serving the latest version of the files.
-    git.pull()
-    .setCredentialsProvider(credentialsProvider)
-    .call();
+    Object lock = getLock(repositoryUri);
+    synchronized (lock) {
+      Git git = repositoryProvider.getRepository(repositoryUri, credentialsProvider);
+      prepareRepository(git, branchName, credentialsProvider);
+      
+      // Make sure we are serving the latest version of the files.
+      git.pull()
+      .setCredentialsProvider(credentialsProvider)
+      .call();
+      
+      File rootDir = getGitRepoDir(git);
+      File folderToListFileFor = new File(rootDir, path);
+      
+      File[] filesList = null;
+      if (folderToListFileFor.isDirectory()) {
+        filesList = folderToListFileFor.listFiles();
+      }
+      
+      git.close();
+      
+      return filesList != null ? filesList : new File[0];      
+    }
+  }
+  
+  /**
+   * TODO: repository URIs: git: http: https: are equivalent.
+   * 
+   * @param key The key for which to return a lock.
+   * @return A lock object for the given key.
+   */
+  private synchronized Object getLock(String key) {
+    Object lock = locks.get(key);
     
-    File rootDir = getGitRepoDir(git);
-    File folderToListFileFor = new File(rootDir, path);
-
-    File[] filesList = null;
-    if (folderToListFileFor.isDirectory()) {
-      filesList = folderToListFileFor.listFiles();
+    if (lock == null) {
+      lock = new Object();
+      locks.put(key, lock);
     }
     
-    git.close();
-    
-    return filesList != null ? filesList : new File[0];
+    return lock;
   }
 }
